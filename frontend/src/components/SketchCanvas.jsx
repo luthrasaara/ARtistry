@@ -7,6 +7,7 @@ const SketchCanvas = ({ onExport }) => {
   const [color, setColor] = useState("#000000");
   const [lineWidth, setLineWidth] = useState(3);
   const [history, setHistory] = useState([]);
+  const [isEraser, setIsEraser] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -27,7 +28,7 @@ const SketchCanvas = ({ onExport }) => {
   const draw = (e) => {
     if (!drawing) return;
     const ctx = canvasRef.current.getContext("2d");
-    ctx.strokeStyle = color;
+    ctx.strokeStyle = isEraser ? "#ffffff" : color; // use white for eraser
     ctx.lineWidth = lineWidth;
     ctx.lineCap = "round";
     ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
@@ -37,23 +38,27 @@ const SketchCanvas = ({ onExport }) => {
   const stopDrawing = () => {
     if (!drawing) return;
     const canvas = canvasRef.current;
-    setHistory([...history, canvas.toDataURL()]);
+    const snapshot = canvas.toDataURL();
+    setHistory((prev) => [...prev, snapshot]);
     setDrawing(false);
   };
 
   const undo = () => {
-    if (history.length === 0) return;
-    const ctx = canvasRef.current.getContext("2d");
-    const newHistory = [...history];
-    newHistory.pop();
+    if (history.length <= 1) {
+      clearCanvas();
+      return;
+    }
+
+    const newHistory = history.slice(0, -1);
     setHistory(newHistory);
 
+    const ctx = canvasRef.current.getContext("2d");
     const img = new Image();
     img.onload = () => {
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       ctx.drawImage(img, 0, 0);
     };
-    img.src = newHistory[newHistory.length - 1] || "";
+    img.src = newHistory[newHistory.length - 1];
   };
 
   const clearCanvas = () => {
@@ -79,10 +84,17 @@ const SketchCanvas = ({ onExport }) => {
         undo={undo}
         clearCanvas={clearCanvas}
         exportCanvas={exportCanvas}
+        isEraser={isEraser}
+        setIsEraser={setIsEraser}
       />
       <canvas
         ref={canvasRef}
-        style={{ border: "1px solid #000", marginTop: "10px" }}
+        style={{
+          border: "1px solid #000",
+          marginTop: "10px",
+          backgroundColor: "#fff",
+          cursor: isEraser ? "cell" : "crosshair",
+        }}
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}

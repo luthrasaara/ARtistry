@@ -1,6 +1,6 @@
 import React from "react";
 
-const SketchToolbar = ({ color, setColor, lineWidth, setLineWidth, undo, clearCanvas, exportCanvas }) => {
+const SketchToolbar = ({ color, setColor, lineWidth, setLineWidth, undo, clearCanvas, isEraser, exportCanvas, setIsEraser }) => {
   return (
     <div style={{ display: "flex", gap: "10px", marginBottom: "5px" }}>
       <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
@@ -13,7 +13,11 @@ const SketchToolbar = ({ color, setColor, lineWidth, setLineWidth, undo, clearCa
       />
       <button onClick={undo}>Undo</button>
       <button onClick={clearCanvas}>Clear</button>
+      <button onClick={() => setIsEraser(!isEraser)}>
+        {isEraser ? "Pen" : "Eraser"}
+      </button>
       <button onClick={exportCanvas}>Export</button>
+
     </div>
   );
 };
