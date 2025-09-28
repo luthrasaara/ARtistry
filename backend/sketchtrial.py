@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-HF_API_KEY = "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"
+HF_API_KEY = "beep"
 HF_MODEL = "stabilityai/stable-fast-3d"
 
 if not HF_API_KEY:
