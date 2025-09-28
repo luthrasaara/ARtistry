@@ -24,284 +24,75 @@ const VIEWS = {
 // ===========================================
 // 1. SKETCH TOOLBAR COMPONENT (Nested)
 // ===========================================
-// Based on user provided SketchToolbar.jsx
-const SketchToolbar = ({ 
-  color, 
-  setColor, 
-  lineWidth, 
-  setLineWidth, 
-  undo, 
-  clearCanvas, 
-  isEraser, 
-  exportCanvas, 
+const SketchToolbar = ({
+  color,
+  setColor,
+  lineWidth,
+  setLineWidth,
+  undo,
+  clearCanvas,
+  isEraser,
+  exportCanvas,
   setIsEraser,
   isLoading
 }) => {
   const commonColors = [
-    "#000000", "#FF0000", "#00FF00", "#0000FF", "#FFFF00", 
+    "#000000", "#FF0000", "#00FF00", "#0000FF", "#FFFF00",
     "#FF00FF", "#00FFFF", "#FFA500", "#800080", "#FFC0CB"
   ];
-
   const exportButtonText = isLoading ? 'Processing...' : 'Detect Drawing';
   const exportButtonDisabled = isLoading;
 
   return (
-    <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200/50 p-3 sm:p-6 mb-4 sm:mb-6 transition-all duration-300 hover:shadow-2xl hover:bg-white/95">
-      
-      {/* Mobile Layout - Stacked */}
-      <div className="flex flex-col gap-4 sm:hidden">
-        {/* Color Section - Mobile */}
-        <div className="flex items-center gap-2 bg-gradient-to-r from-blue-50/80 to-purple-50/80 rounded-xl p-3 transition-all duration-300 hover:from-blue-100/80 hover:to-purple-100/80">
-          <Palette className="w-4 h-4 text-gray-600 flex-shrink-0 animate-pulse" />
-          <div className="flex items-center gap-2 overflow-x-auto">
-            <div className="relative group">
-              <input 
-                type="color" 
-                value={color} 
-                onChange={(e) => setColor(e.target.value)}
-                className="w-10 h-10 rounded-lg border-2  cursor-pointer hover:border-gray-300 transition-all duration-300 flex-shrink-0 hover:scale-110 hover:rotate-6"
-                style={{ backgroundColor: color }}
-              />
-              <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full border-2 border-white shadow-md transition-all duration-300 group-hover:scale-125"
-                   style={{ backgroundColor: color }}></div>
-            </div>
-            <div className="flex gap-1">
-              {commonColors.slice(0, 6).map((c, index) => (
-                <button
-                  key={c}
-                  onClick={() => setColor(c)}
-                  className="w-7 h-7 rounded-full border-2 hover:border-gray-400 transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0 shadow-sm hover:shadow-md"
-                  style={{ 
-                    backgroundColor: c,
-                    animationDelay: `${index * 50}ms`
-                  }}
-                  disabled={exportButtonDisabled}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Brush Size Section - Mobile */}
-        <div className="flex items-center gap-2 bg-gradient-to-r from-green-50/80 to-blue-50/80 rounded-xl p-3 transition-all duration-300 hover:from-green-100/80 hover:to-blue-100/80">
-          <Edit3 className="w-4 h-4 text-gray-600 flex-shrink-0" />
-          <div className="flex items-center gap-2 flex-1">
-            <button 
-              onClick={() => setLineWidth(Math.max(1, lineWidth - 1))}
-              className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-lg border border-gray-200 hover:bg-white hover:scale-110 flex items-center justify-center transition-all duration-300 flex-shrink-0 hover:shadow-md"
-              disabled={exportButtonDisabled}
-            >
-              <Minus className="w-3 h-3" />
-            </button>
-            <input
-              type="range"
-              min="1"
-              max="20"
-              value={lineWidth}
-              onChange={(e) => setLineWidth(e.target.value)}
-              className="flex-1 accent-blue-500 transition-all duration-300"
-              disabled={exportButtonDisabled}
-            />
-            <button 
-              onClick={() => setLineWidth(Math.min(20, parseInt(lineWidth) + 1))}
-              className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-lg border border-gray-200 hover:bg-white hover:scale-110 flex items-center justify-center transition-all duration-300 flex-shrink-0 hover:shadow-md"
-              disabled={exportButtonDisabled}
-            >
-              <Plus className="w-3 h-3" />
-            </button>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <div 
-                className="rounded-full border-2 border-gray-300 transition-all duration-300"
-                style={{ 
-                  width: `${Math.max(8, Math.min(20, lineWidth * 1.5))}px`, 
-                  height: `${Math.max(8, Math.min(20, lineWidth * 1.5))}px`,
-                  backgroundColor: isEraser ? '#ef4444' : color
-                }}
-              ></div>
-              <span className="text-sm text-gray-600 min-w-[2.5rem] text-center">{lineWidth}px</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tools Section - Mobile (2x2 Grid) */}
-        <div className="grid grid-cols-2 gap-2">
+    <div className="toolbar">
+      <div className="toolbar-section">
+        <input
+          type="color"
+          value={color}
+          onChange={e => setColor(e.target.value)}
+          className="color-picker"
+          disabled={exportButtonDisabled}
+        />
+        {commonColors.map(c => (
           <button
-            onClick={() => setIsEraser(!isEraser)}
-            className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 transition-all duration-300 text-sm transform hover:scale-105 ${
-              isEraser 
-                ? 'bg-gradient-to-r from-red-50 to-pink-50 border-red-200 text-red-700 hover:from-red-100 hover:to-pink-100 shadow-red-100' 
-                : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 text-blue-700 hover:from-blue-100 hover:to-indigo-100 shadow-blue-100'
-            } hover:shadow-lg`}
+            key={c}
+            onClick={() => setColor(c)}
+            className={`color-swatch${color === c ? ' selected' : ''}`}
+            style={{ backgroundColor: c }}
             disabled={exportButtonDisabled}
-          >
-            {isEraser ? <Edit3 className="w-4 h-4 animate-bounce" /> : <Eraser className="w-4 h-4" />}
-            {isEraser ? 'Pen' : 'Eraser'}
-          </button>
-          
-          <button
-            onClick={undo}
-            className="flex items-center justify-center gap-2 px-3 py-3 bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100 text-gray-700 rounded-xl border-2 border-gray-200 transition-all duration-300 hover:border-gray-300 text-sm transform hover:scale-105 hover:shadow-lg"
-            disabled={exportButtonDisabled}
-          >
-            <RotateCcw className="w-4 h-4 hover:rotate-180 transition-transform duration-500" />
-            Undo
-          </button>
-          
-          <button
-            onClick={clearCanvas}
-            className="flex items-center justify-center gap-2 px-3 py-3 bg-gradient-to-r from-red-50 to-orange-50 hover:from-red-100 hover:to-orange-100 text-red-700 rounded-xl border-2 border-red-200 transition-all duration-300 hover:border-red-300 text-sm transform hover:scale-105 hover:shadow-lg shadow-red-100"
-            disabled={exportButtonDisabled}
-          >
-            <Trash2 className="w-4 h-4 hover:animate-bounce" />
-            Clear
-          </button>
-          
-          <button
-            onClick={exportCanvas}
-            className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 transition-all duration-300 text-sm transform hover:scale-105 ${
-              exportButtonDisabled 
-                ? 'bg-gray-400 text-gray-700 border-gray-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 text-green-700 border-green-200 hover:border-green-300 shadow-green-100'
-            } hover:shadow-lg`}
-            disabled={exportButtonDisabled}
-          >
-            <Download className={`w-4 h-4 ${exportButtonDisabled ? 'animate-spin' : 'hover:animate-bounce'}`} />
-            {exportButtonText}
-          </button>
-        </div>
+          />
+        ))}
       </div>
-
-      {/* Desktop Layout - Horizontal */}
-      <div className="hidden sm:flex flex-wrap items-center gap-4">
-        {/* Color Section - Desktop */}
-        <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50/80 to-purple-50/80 rounded-xl p-3 transition-all duration-300 hover:from-blue-100/80 hover:to-purple-100/80 hover:shadow-lg">
-          <Palette className="w-5 h-5 text-gray-600 animate-pulse" />
-          <div className="flex items-center gap-3">
-            <div className="relative group">
-              <input 
-                type="color" 
-                value={color} 
-                onChange={(e) => setColor(e.target.value)}
-                className="w-12 h-12 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-gray-300 transition-all duration-300 hover:scale-110 hover:rotate-6"
-                style={{ backgroundColor: color }}
-                disabled={exportButtonDisabled}
-              />
-              <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full border-2 border-white shadow-md transition-all duration-300 group-hover:scale-125"
-                   style={{ backgroundColor: color }}></div>
-            </div>
-            <div className="flex gap-1">
-              {commonColors.map((c, index) => (
-                <button
-                  key={c}
-                  onClick={() => setColor(c)}
-                  className="w-8 h-8 rounded-full border-2 border-gray-200 hover:border-gray-400 transition-all duration-300 hover:scale-110 hover:-translate-y-1 shadow-sm hover:shadow-md"
-                  style={{ 
-                    backgroundColor: c,
-                    animationDelay: `${index * 50}ms`
-                  }}
-                  disabled={exportButtonDisabled}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Brush Size Section - Desktop */}
-        <div className="flex items-center gap-3 bg-gradient-to-r from-green-50/80 to-blue-50/80 rounded-xl p-3 transition-all duration-300 hover:from-green-100/80 hover:to-blue-100/80 hover:shadow-lg">
-          <Edit3 className="w-5 h-5 text-gray-600" />
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setLineWidth(Math.max(1, lineWidth - 1))}
-              className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-lg border border-gray-200 hover:bg-white hover:scale-110 flex items-center justify-center transition-all duration-300 hover:shadow-md"
-              disabled={exportButtonDisabled}
-            >
-              <Minus className="w-4 h-4" />
-            </button>
-            <input
-              type="range"
-              min="1"
-              max="20"
-              value={lineWidth}
-              onChange={(e) => setLineWidth(e.target.value)}
-              className="w-24 accent-blue-500 transition-all duration-300"
-              disabled={exportButtonDisabled}
-            />
-            <button 
-              onClick={() => setLineWidth(Math.min(20, parseInt(lineWidth) + 1))}
-              className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-lg border border-gray-200 hover:bg-white hover:scale-110 flex items-center justify-center transition-all duration-300 hover:shadow-md"
-              disabled={exportButtonDisabled}
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            <div className="flex items-center gap-2">
-              <div 
-                className="rounded-full border-2 border-gray-300 transition-all duration-300 shadow-sm"
-                style={{ 
-                  width: `${Math.max(10, Math.min(24, lineWidth * 1.5))}px`, 
-                  height: `${Math.max(10, Math.min(24, lineWidth * 1.5))}px`,
-                  backgroundColor: isEraser ? '#ef4444' : color
-                }}
-              ></div>
-              <span className="text-sm text-gray-600 min-w-[2rem] text-center font-medium">{lineWidth}px</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tools Section - Desktop */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsEraser(!isEraser)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 ${
-              isEraser 
-                ? 'bg-gradient-to-r from-red-50 to-pink-50 border-red-200 text-red-700 hover:from-red-100 hover:to-pink-100 shadow-red-100' 
-                : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 text-blue-700 hover:from-blue-100 hover:to-indigo-100 shadow-blue-100'
-            } hover:shadow-lg`}
-            disabled={exportButtonDisabled}
-          >
-            {isEraser ? <Edit3 className="w-4 h-4 animate-bounce" /> : <Eraser className="w-4 h-4" />}
-            {isEraser ? 'Pen' : 'Eraser'}
-          </button>
-          
-          <button
-            onClick={undo}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100 text-gray-700 rounded-xl border-2 border-gray-200 transition-all duration-300 hover:border-gray-300 transform hover:scale-105 hover:-translate-y-1 hover:shadow-lg"
-            disabled={exportButtonDisabled}
-          >
-            <RotateCcw className="w-4 h-4 hover:rotate-180 transition-transform duration-500" />
-            Undo
-          </button>
-          
-          <button
-            onClick={clearCanvas}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-50 to-orange-50 hover:from-red-100 hover:to-orange-100 text-red-700 rounded-xl border-2 border-red-200 transition-all duration-300 hover:border-red-300 transform hover:scale-105 hover:-translate-y-1 hover:shadow-lg shadow-red-100"
-            disabled={exportButtonDisabled}
-          >
-            <Trash2 className="w-4 h-4 hover:animate-bounce" />
-          </button>
-          
-          <button
-            onClick={exportCanvas}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 ${
-              exportButtonDisabled 
-                ? 'bg-gray-400 text-gray-700 border-gray-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 text-green-700 border-green-200 hover:border-green-300 shadow-green-100'
-            } hover:shadow-lg`}
-            disabled={exportButtonDisabled}
-          >
-            <Download className={`w-4 h-4 ${exportButtonDisabled ? 'animate-spin' : 'hover:animate-bounce'}`} />
-            {exportButtonText}
-          </button>
-        </div>
+      <div className="toolbar-section">
+        <button onClick={() => setLineWidth(Math.max(1, lineWidth - 1))} disabled={exportButtonDisabled}>-</button>
+        <input
+          type="range"
+          min="1"
+          max="20"
+          value={lineWidth}
+          onChange={e => setLineWidth(Number(e.target.value))}
+          className="brush-range"
+          disabled={exportButtonDisabled}
+        />
+        <button onClick={() => setLineWidth(Math.min(20, lineWidth + 1))} disabled={exportButtonDisabled}>+</button>
+        <span className="brush-size" style={{ background: isEraser ? '#ef4444' : color }}></span>
+        <span>{lineWidth}px</span>
+      </div>
+      <div className="toolbar-section">
+        <button onClick={() => setIsEraser(!isEraser)} disabled={exportButtonDisabled}>
+          {isEraser ? 'Pen' : 'Eraser'}
+        </button>
+        <button onClick={undo} disabled={exportButtonDisabled}>Undo</button>
+        <button onClick={clearCanvas} disabled={exportButtonDisabled}>Clear</button>
+        <button onClick={exportCanvas} disabled={exportButtonDisabled}>{exportButtonText}</button>
       </div>
     </div>
   );
 };
 
-
 // ===========================================
 // 2. DRAWING VIEW (Replaces SketchCanvas for full drawing screen)
 // ===========================================
-// Based on user provided SketchCanvas.jsx
 const DrawingView = ({ onExport, isLoading }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -539,89 +330,57 @@ const DrawingView = ({ onExport, isLoading }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100 overflow-hidden flex flex-col items-center justify-center">
-      <div className="h-screen w-full flex flex-col items-center justify-center" ref={containerRef}>
-        {/* Header - Integrated */}
-        <div className="text-center py-4 sm:py-6 px-4 bg-white/60 backdrop-blur-md border-b border-white/20 flex-shrink-0 w-full flex flex-col items-center">
-          <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2 animate-fade-in">
-            Digital Sketch Canvas
-          </h1>
-          <p className="text-sm sm:text-base text-gray-600 animate-fade-in-delay">
-            Create on an infinite grid canvas
-          </p>
+    <div className="drawing-bg">
+      <div className="drawing-container" ref={containerRef}>
+        <div className="drawing-header">
+          <h1 className="drawing-title">Digital Sketch Canvas</h1>
+          <p className="drawing-subtitle">Create on an infinite grid canvas</p>
         </div>
-        
-        {/* Toolbar - Integrated */}
-        <div className="px-4 pt-4 flex-shrink-0 w-full flex justify-center">
-          <SketchToolbar
-            color={color}
-            setColor={setColor}
-            lineWidth={lineWidth}
-            setLineWidth={setLineWidth}
-            undo={undo}
-            clearCanvas={clearCanvas}
-            exportCanvas={exportCanvas}
-            isEraser={isEraser}
-            setIsEraser={setIsEraser}
-            isLoading={isLoading} 
+        <SketchToolbar
+          color={color}
+          setColor={setColor}
+          lineWidth={lineWidth}
+          setLineWidth={setLineWidth}
+          undo={undo}
+          clearCanvas={clearCanvas}
+          exportCanvas={exportCanvas}
+          isEraser={isEraser}
+          setIsEraser={setIsEraser}
+          isLoading={isLoading}
+        />
+        <div className="canvas-wrapper">
+          <canvas
+            ref={canvasRef}
+            width={canvasSize.width}
+            height={canvasSize.height}
+            className={`drawing-canvas${isEraser ? ' eraser' : ''}${drawing ? ' drawing' : ''}${isLoading ? ' loading' : ''}`}
+            style={{
+              backgroundColor: "#fff"
+            }}
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onTouchStart={startDrawing}
+            onTouchMove={draw}
+            onTouchEnd={stopDrawing}
+            onTouchCancel={stopDrawing}
           />
         </div>
-        
-        {/* Canvas Container - Centered */}
-        <div className="flex-1 px-4 pb-4 overflow-hidden min-h-0 w-full flex items-center justify-center">
-          <div className="h-full bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-200/50 p-2 sm:p-4 transition-all duration-500 hover:shadow-3xl flex items-center justify-center">
-            <canvas
-              ref={canvasRef}
-              width={canvasSize.width}
-              height={canvasSize.height}
-              className={`w-full h-full rounded-xl transition-all duration-300 ${
-                isEraser ? 'cursor-cell' : 'cursor-crosshair'
-              } ${drawing ? 'cursor-none' : ''} ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}
-              style={{
-                backgroundColor: "#fff",
-                boxShadow: "inset 0 0 20px rgba(59, 130, 246, 0.1)",
-                border: "2px solid rgba(59, 130, 246, 0.2)"
-              }}
-              // Mouse events
-              onMouseDown={startDrawing}
-              onMouseMove={draw}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
-              // Touch events
-              onTouchStart={startDrawing}
-              onTouchMove={draw}
-              onTouchEnd={stopDrawing}
-              onTouchCancel={stopDrawing}
-            />
-          </div>
-        </div>
-        
-        {/* Footer - Integrated */}
-        <div className="text-center py-2 px-4 bg-white/60 backdrop-blur-md border-t border-white/20 flex-shrink-0 w-full flex justify-center">
-          <p className="text-xs sm:text-sm text-gray-500">
-            <span className="hidden sm:inline">Draw freely on the grid • {isEraser ? 'Erasing' : 'Drawing'} with </span>
-            <span className="sm:hidden">{isEraser ? 'Erasing' : 'Drawing'} • </span>
-            <span 
-              className="inline-block w-3 h-3 rounded-full border border-gray-300 mx-1 animate-pulse"
-              style={{ backgroundColor: isEraser ? '#ef4444' : color }}
-            ></span>
-            <span className="font-medium">{lineWidth}px {isEraser ? 'eraser' : 'pen'}</span>
-            {isLoading && <span className="text-blue-500 ml-2 animate-pulse">| Detecting drawing...</span>}
-          </p>
+        <div className="drawing-footer">
+          <span>{isEraser ? 'Erasing' : 'Drawing'} • </span>
+          <span className="footer-dot" style={{ background: isEraser ? '#ef4444' : color }}></span>
+          <span>{lineWidth}px {isEraser ? 'eraser' : 'pen'}</span>
+          {isLoading && <span className="footer-loading">| Detecting drawing...</span>}
         </div>
       </div>
-
-      {/* Custom cursor when drawing */}
       {drawing && (
-        <div 
-          className="fixed pointer-events-none z-50 rounded-full border-2 border-gray-400 mix-blend-difference transition-all duration-100"
+        <div
+          className="custom-cursor"
           style={{
             width: `${lineWidth * 2}px`,
             height: `${lineWidth * 2}px`,
-            backgroundColor: isEraser ? 'rgba(239, 68, 68, 0.5)' : `${color}40`,
-            transform: 'translate(-50%, -50%)',
-            left: 'var(--mouse-x)',
-            top: 'var(--mouse-y)'
+            backgroundColor: isEraser ? 'rgba(239, 68, 68, 0.5)' : `${color}40`
           }}
         />
       )}
@@ -639,15 +398,7 @@ const Button = ({ children, onClick, disabled = false, className = '' }) => (
   <button
     onClick={onClick}
     disabled={disabled}
-    className={`
-      flex items-center justify-center space-x-2 px-4 py-2 text-sm font-medium 
-      rounded-xl shadow-lg transition-colors duration-200 
-      ${disabled 
-        ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
-        : 'bg-indigo-600 hover:bg-indigo-700 text-white active:bg-indigo-800'
-      }
-      ${className}
-    `}
+    className={`custom-btn ${disabled ? 'btn-disabled' : ''} ${className}`}
   >
     {children}
   </button>
@@ -657,8 +408,15 @@ const Button = ({ children, onClick, disabled = false, className = '' }) => (
 // ===========================================
 // 4. DETECTED IMAGE DISPLAY
 // ===========================================
-const DetectedImageDisplay = ({ base64Image, detectedObjects, onGenerateAR, isLoading, loadingMessage, isGenerationFailed }) => {
-  const canvasRef = useRef(null);
+const DetectedImageDisplay = ({
+  base64Image,
+  detectedObjects,
+  onGenerateAR,
+  isLoading,
+  loadingMessage,
+  isGenerationFailed
+}) => {
+  const canvasRef = React.useRef(null);
 
   React.useEffect(() => {
     if (base64Image && detectedObjects && canvasRef.current) {
@@ -667,32 +425,31 @@ const DetectedImageDisplay = ({ base64Image, detectedObjects, onGenerateAR, isLo
       const img = new Image();
 
       img.onload = () => {
-        canvas.width = 400; 
+        canvas.width = 400;
         canvas.height = 400;
-        
-        ctx.clearRect(0, 0, canvas.width, canvas.height); 
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height); 
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
         const scaleX = canvas.width / img.width;
         const scaleY = canvas.height / img.height;
 
-
         detectedObjects.forEach(obj => {
-          const [x1, y1, x2, y2] = obj.bounding_box; 
+          const [x1, y1, x2, y2] = obj.bounding_box;
           const scaled_x1 = x1 * scaleX;
           const scaled_y1 = y1 * scaleY;
           const scaled_width = (x2 - x1) * scaleX;
           const scaled_height = (y2 - y1) * scaleY;
 
           // Draw Rectangle
-          ctx.strokeStyle = '#ef4444'; 
+          ctx.strokeStyle = '#ef4444';
           ctx.lineWidth = 2;
           ctx.strokeRect(scaled_x1, scaled_y1, scaled_width, scaled_height);
 
           // Draw Label
-          ctx.fillStyle = '#ef4444'; 
+          ctx.fillStyle = '#ef4444';
           ctx.font = 'bold 14px Inter, sans-serif';
-          ctx.fillText(obj.name, scaled_x1, scaled_y1 > 15 ? scaled_y1 - 5 : scaled_y1 + 15); 
+          ctx.fillText(obj.name, scaled_x1, scaled_y1 > 15 ? scaled_y1 - 5 : scaled_y1 + 15);
         });
       };
       img.src = base64Image;
@@ -700,43 +457,40 @@ const DetectedImageDisplay = ({ base64Image, detectedObjects, onGenerateAR, isLo
   }, [base64Image, detectedObjects]);
 
   // Determine button state and text based on loading/failure status
-  const buttonText = isGenerationFailed 
-    ? 'Retry Generation' 
+  const buttonText = isGenerationFailed
+    ? 'Retry Generation'
     : (isLoading ? 'Generating AR Model... ⏳' : 'Next: Generate 3D AR Model');
-    
+
   const buttonClassName = isGenerationFailed
-    ? 'bg-red-600 hover:bg-red-700' 
-    : (isLoading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700');
-    
+    ? 'btn-error'
+    : (isLoading ? 'btn-loading' : 'btn-primary');
+
   const messageClassName = isGenerationFailed
-      ? 'text-red-700 bg-red-50' 
-      : 'text-indigo-700 bg-indigo-50';
+    ? 'msg-error'
+    : 'msg-info';
 
   return (
-    <div className="p-4 bg-gray-50 rounded-lg shadow-md w-full max-w-sm mx-auto">
-      <h3 className="text-xl font-semibold mb-4 text-gray-800 text-center">Detected Objects</h3>
-      <div className="flex justify-center mb-4">
-        <canvas 
-          ref={canvasRef} 
-          width="400" 
+    <div className="detected-container">
+      <h3 className="detected-title">Detected Objects</h3>
+      <div className="detected-canvas-wrap">
+        <canvas
+          ref={canvasRef}
+          width="400"
           height="400"
-          className="border-2 border-red-500 rounded-lg shadow-inner bg-white w-full h-auto max-w-full" 
+          className="detected-canvas"
         />
       </div>
-      
-      <button 
-        onClick={onGenerateAR} 
-        className={`w-full py-3 mt-4 text-white font-bold rounded-lg transition duration-300 shadow-md ${buttonClassName}`}
-        // Button is disabled only when actively loading AND not in a failed state
+      <Button
+        onClick={onGenerateAR}
         disabled={isLoading && !isGenerationFailed}
+        className={`detected-btn ${buttonClassName}`}
       >
         {buttonText}
-      </button>
-      {/* Display dynamic loading message/error */}
+      </Button>
       {(isLoading || isGenerationFailed) && (
-          <p className={`text-center text-sm font-medium mt-2 p-2 rounded-lg ${messageClassName} ${isLoading && 'animate-pulse'}`}>
-              {loadingMessage || 'Starting generation...'}
-          </p>
+        <p className={`detected-msg ${messageClassName} ${isLoading ? 'msg-pulse' : ''}`}>
+          {loadingMessage || 'Starting generation...'}
+        </p>
       )}
     </div>
   );
