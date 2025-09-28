@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from "react"; 
+import ReactDOM from 'react-dom/client';
 import { RefreshCw, Loader2, Zap, Palette, Eraser, Edit3, RotateCcw, Trash2, Download, Minus, Plus } from 'lucide-react'; 
 import ARViewer from './components/ARViewer';
+import './index.css'; 
 
 const DETECT_API_URL = "http://localhost:8000/detect_objects/"; 
 // const AR_GENERATE_API_URL = "http://localhost:8000/image_to_ar/";
