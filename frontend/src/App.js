@@ -655,8 +655,14 @@ export default function CreatePage() {
   };
 
   return (
-    // Only apply max-width/margin/padding for non-drawing views
-    <div className={currentView !== VIEWS.DRAWING ? "max-w-4xl mx-auto" : ""}>
+    <div
+      className={
+        currentView !== VIEWS.DRAWING
+          ? "max-w-4xl mx-auto full-viewport"
+          : "drawing-bg full-viewport"
+      }
+      style={{ height: "100vh", overflow: "hidden" }}
+    >
       {renderContent()}
     </div>
   );
