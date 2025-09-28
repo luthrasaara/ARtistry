@@ -19,7 +19,7 @@ if not api_key:
     # Use a dummy key if running locally without the environment variable set
     print("WARNING: GEMINI_API environment variable not set.")
     # This prevents the script from crashing on genai.configure()
-    genai.configure(api_key="DUMMY_API_KEY") 
+    genai.configure(api_key="AIzaSyD2-SGMSVY6fp4WZPLmL7v0h2ORk7Episk") 
 else:
     genai.configure(api_key=api_key) 
     
