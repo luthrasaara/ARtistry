@@ -1,0 +1,28 @@
+/* HomePage.css */
+.homepage {
+  position: relative;
+  width: 100%;
+  height: 100vh; /* Full screen */
+  overflow: hidden; /* Prevent scrollbars if Spline is larger */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.link-btn {
+  display: inline-block;
+  padding: 12px 24px;
+  background: #d05ca8ff;
+  color: white;
+  font-weight: bold;
+  text-decoration: none;
+  border-radius: 6px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.link-btn:hover {
+  opacity: 1; /* fully visible on hover */
+}

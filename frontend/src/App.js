@@ -57,7 +57,7 @@ const SketchToolbar = ({
                 type="color" 
                 value={color} 
                 onChange={(e) => setColor(e.target.value)}
-                className="w-10 h-10 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-gray-300 transition-all duration-300 flex-shrink-0 hover:scale-110 hover:rotate-6"
+                className="w-10 h-10 rounded-lg border-2  cursor-pointer hover:border-gray-300 transition-all duration-300 flex-shrink-0 hover:scale-110 hover:rotate-6"
                 style={{ backgroundColor: color }}
               />
               <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full border-2 border-white shadow-md transition-all duration-300 group-hover:scale-125"
@@ -68,7 +68,7 @@ const SketchToolbar = ({
                 <button
                   key={c}
                   onClick={() => setColor(c)}
-                  className="w-7 h-7 rounded-full border-2 border-gray-200 hover:border-gray-400 transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0 shadow-sm hover:shadow-md"
+                  className="w-7 h-7 rounded-full border-2 hover:border-gray-400 transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0 shadow-sm hover:shadow-md"
                   style={{ 
                     backgroundColor: c,
                     animationDelay: `${index * 50}ms`
@@ -275,7 +275,6 @@ const SketchToolbar = ({
             disabled={exportButtonDisabled}
           >
             <Trash2 className="w-4 h-4 hover:animate-bounce" />
-            Clear
           </button>
           
           <button
@@ -538,10 +537,10 @@ const DrawingView = ({ onExport, isLoading }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100 overflow-hidden">
-      <div className="h-screen flex flex-col" ref={containerRef}>
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100 overflow-hidden flex flex-col items-center justify-center">
+      <div className="h-screen w-full flex flex-col items-center justify-center" ref={containerRef}>
         {/* Header - Integrated */}
-        <div className="text-center py-4 sm:py-6 px-4 bg-white/60 backdrop-blur-md border-b border-white/20 flex-shrink-0">
+        <div className="text-center py-4 sm:py-6 px-4 bg-white/60 backdrop-blur-md border-b border-white/20 flex-shrink-0 w-full flex flex-col items-center">
           <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2 animate-fade-in">
             Digital Sketch Canvas
           </h1>
@@ -551,7 +550,7 @@ const DrawingView = ({ onExport, isLoading }) => {
         </div>
         
         {/* Toolbar - Integrated */}
-        <div className="px-4 pt-4 flex-shrink-0">
+        <div className="px-4 pt-4 flex-shrink-0 w-full flex justify-center">
           <SketchToolbar
             color={color}
             setColor={setColor}
@@ -566,9 +565,9 @@ const DrawingView = ({ onExport, isLoading }) => {
           />
         </div>
         
-        {/* Canvas Container - Full remaining space */}
-        <div className="flex-1 px-4 pb-4 overflow-hidden min-h-0">
-          <div className="h-full bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-200/50 p-2 sm:p-4 transition-all duration-500 hover:shadow-3xl">
+        {/* Canvas Container - Centered */}
+        <div className="flex-1 px-4 pb-4 overflow-hidden min-h-0 w-full flex items-center justify-center">
+          <div className="h-full bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-200/50 p-2 sm:p-4 transition-all duration-500 hover:shadow-3xl flex items-center justify-center">
             <canvas
               ref={canvasRef}
               width={canvasSize.width}
@@ -596,7 +595,7 @@ const DrawingView = ({ onExport, isLoading }) => {
         </div>
         
         {/* Footer - Integrated */}
-        <div className="text-center py-2 px-4 bg-white/60 backdrop-blur-md border-t border-white/20 flex-shrink-0">
+        <div className="text-center py-2 px-4 bg-white/60 backdrop-blur-md border-t border-white/20 flex-shrink-0 w-full flex justify-center">
           <p className="text-xs sm:text-sm text-gray-500">
             <span className="hidden sm:inline">Draw freely on the grid • {isEraser ? 'Erasing' : 'Drawing'} with </span>
             <span className="sm:hidden">{isEraser ? 'Erasing' : 'Drawing'} • </span>
@@ -619,7 +618,7 @@ const DrawingView = ({ onExport, isLoading }) => {
             height: `${lineWidth * 2}px`,
             backgroundColor: isEraser ? 'rgba(239, 68, 68, 0.5)' : `${color}40`,
             transform: 'translate(-50%, -50%)',
-            left: 'var(--mouse-x)', // Will be set by a global event listener if needed, but not implemented here.
+            left: 'var(--mouse-x)',
             top: 'var(--mouse-y)'
           }}
         />
@@ -884,13 +883,10 @@ export default function CreatePage() {
       case VIEWS.AR_VIEWER:
         return (
           <div className="fixed inset-0 min-h-screen w-screen bg-gradient-to-br from-indigo-100 via-blue-100 to-purple-100 flex flex-col items-center justify-center">
-            <button onClick={handleBackToDrawing} className={backButtonClass + " absolute top-8 left-8"}>
-              ← Start Over
-            </button>
-            <h2 className="text-2xl font-bold mb-4 text-gray-700 text-center">Your AR Model ✨</h2>
+            
             {/* ARViewer uses the hardcoded model path */}
             <div className="flex-grow w-full h-full flex items-center justify-center">
-              <div className="w-full h-full rounded-3xl overflow-hidden shadow-2xl border-4 border-indigo-200 bg-white/80 flex items-center justify-center">
+              <div className="w-full h-full  overflow-hidden shadow-2xl border-4 border-indigo-200 bg-white/80 flex items-center justify-center">
                 <ARViewer modelPath={GENERATED_MODEL_PUBLIC_URL} />
               </div>
             </div>
