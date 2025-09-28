@@ -1,11 +1,12 @@
 import React, { useEffect } from "react";
 import SketchCanvas from "./components/SketchCanvas";
+import ARViewer from "./components/ARViewer";
 
 const BACKEND_API_URL = "http://127.0.0.1:5000/image_to_ar/"; // **Replace with your actual backend endpoint**
 const IMAGE_PATH = "/rose.png"; // **Path relative to your public folder**
 
 export default function CreatePage() {
-
+  /*
   // Function to fetch the local image and post it to the backend
   const uploadAndGenerate = async () => {
     try {
@@ -69,13 +70,11 @@ export default function CreatePage() {
   // but typically you'd trigger this with a button or after a user action.
   useEffect(() => {
     uploadAndGenerate();
-  }, []);
+  }, []);*/
 
   return (
     <div>
-      <h1>Draw Your Sketch</h1>
-      <p>Attempting to upload local image {IMAGE_PATH} to backend...</p>
-      <SketchCanvas onExport={handleExport} />
+      <ARViewer />
     </div>
   );
 }
