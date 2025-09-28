@@ -2,12 +2,12 @@ import os
 import io
 import json
 import base64
-import subprocess # New: For running Stable-Fast-3D CLI
-import shutil     # New: For moving the generated GLB
+import subprocess
+import shutil
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import JSONResponse # FIX: JSONResponse must be imported from fastapi.responses
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.concurrency import run_in_threadpool # Essential for non-blocking execution
+from starlette.concurrency import run_in_threadpool
 
 from PIL import Image
 
@@ -36,25 +36,40 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------------------
-# 1. STABLE-FAST-3D CONFIGURATION (Global Variables)
+# 1. STABLE-FAST-3D CONFIGURATION (Global Variables) - UPDATED FOR PROJECT STRUCTURE
 # ---------------------------------------------------------------------
 
-# 1. Base directory (where run.py and app.py are)
+# 1. Base directory (where app.py and run.py are, e.g., project/backend/)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
 
-# 2. Public folder setup (Frontend access point)
-MODEL_DIR = os.path.join(BASE_DIR, "public", "generated_models")
-os.makedirs(MODEL_DIR, exist_ok=True) 
+# 2. Determine Project Root (Assuming BASE_DIR is project/backend/)
+# Goes up one level (backend/) then up again (project/)
+# This path is 'project/'
+PROJECT_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir)) # Adjusted: Assuming backend is directly under project/
+ROOT_DIR = os.path.abspath(os.path.join(PROJECT_DIR, os.pardir)) # Go up one more level to 'project/'
+STABLE_DIR = os.path.join(ROOT_DIR, "stable-fast-3d") # 'project/stable-fast-3d'
 
-# 3. Temp folders for input/output during generation
-TEMP_OUTPUT_DIR = os.path.join(BASE_DIR, "temp_output") 
-TEMP_INPUT_IMAGE_PATH = os.path.join(BASE_DIR, "temp_input.png")
+# Note: If your structure is project/src/backend, you'd use os.path.join(BASE_DIR, os.pardir, os.pardir)
+
+# 3. Frontend Public Folder setup (The final destination for assets: project/frontend/public/)
+FRONTEND_PUBLIC_DIR = os.path.join(ROOT_DIR, "frontend", "public")
+os.makedirs(FRONTEND_PUBLIC_DIR, exist_ok=True) 
+
+# 4. Temp folders for input/output during generation
+# Input is saved temporarily in the public folder before processing
+TEMP_INPUT_IMAGE_FILENAME = "rose.png"
+TEMP_INPUT_IMAGE_PATH = os.path.join(FRONTEND_PUBLIC_DIR, TEMP_INPUT_IMAGE_FILENAME)
+
+# The 'run.py' script will write its temporary output here (inside the backend)
+TEMP_OUTPUT_DIR = os.path.join(PROJECT_DIR,"frontend", "public", "generated_models") # 'project/backend/public/temp_3d_output/'
 os.makedirs(TEMP_OUTPUT_DIR, exist_ok=True) 
 
-# 4. Final output file name (Fixed URL for the frontend)
+# 5. Final output file name (Fixed URL for the frontend)
 FIXED_GLB_FILENAME = "latest_ar_model.glb"
-FIXED_GLB_PATH = os.path.join(MODEL_DIR, FIXED_GLB_FILENAME)
-FIXED_PUBLIC_URL = f"/generated_models/{FIXED_GLB_FILENAME}"
+FIXED_GLB_PATH = os.path.join(FRONTEND_PUBLIC_DIR, FIXED_GLB_FILENAME)
+
+# The URL the frontend will use to load the model (relative to its own root/public path)
+FIXED_PUBLIC_URL = f"/{FIXED_GLB_FILENAME}" 
 
 
 # ---------------------------------------------------------------------
@@ -64,9 +79,9 @@ FIXED_PUBLIC_URL = f"/generated_models/{FIXED_GLB_FILENAME}"
 # This MUST be a regular synchronous 'def' function.
 def _sync_generate_glb(image_bytes):
     """
-    1. Saves image bytes to a temp file.
+    1. Saves image bytes to a temp file in the public folder.
     2. Runs the 'python run.py' command using subprocess.
-    3. Finds the resulting GLB and moves it to the fixed public folder path.
+    3. Finds the resulting GLB and moves/renames it to the fixed public path.
     """
     
     # 1. Save the incoming image bytes to a temporary file
@@ -80,9 +95,9 @@ def _sync_generate_glb(image_bytes):
     command = [
         "python", 
         "run.py", 
-        TEMP_INPUT_IMAGE_PATH, 
+        TEMP_INPUT_IMAGE_PATH,  # Input from the public folder
         "--output-dir", 
-        TEMP_OUTPUT_DIR
+        TEMP_OUTPUT_DIR         # Output to the temp backend folder
     ]
     
     print(f"Starting 3D generation: {' '.join(command)}")
@@ -91,13 +106,13 @@ def _sync_generate_glb(image_bytes):
         # Execute the command. The check=True ensures an error is raised on failure.
         subprocess.run(
             command, 
-            cwd=BASE_DIR, 
+            cwd=STABLE_DIR, # run.py is in BASE_DIR (project/backend)
             check=True, 
             timeout=1200 # 20 minutes timeout for generation
         )
     except subprocess.CalledProcessError as e:
         # Catches errors from the stable-fast-3d script itself
-        raise Exception(f"3D generation script failed. Output: {e.stderr}")
+        raise Exception(f"3D generation script failed. Output: {e.stderr if e.stderr else e.stdout}")
     except subprocess.TimeoutExpired:
         raise Exception("3D generation timed out.")
     except Exception as e:
@@ -105,22 +120,28 @@ def _sync_generate_glb(image_bytes):
 
     # 3. Find the generated GLB file
     # Stable-Fast-3D names the file based on the input image name within TEMP_OUTPUT_DIR
-    generated_files = [f for f in os.listdir(TEMP_OUTPUT_DIR) if f.endswith('.glb')]
-    
-    if not generated_files:
-        raise Exception("Stable-Fast-3D ran but did not generate a .glb file.")
+    base_name = os.path.splitext(TEMP_INPUT_IMAGE_FILENAME)[0] # 'temp_input_image'
+    expected_glb_filename = f"{base_name}.glb" # 'temp_input_image.glb'
+    temp_glb_path = os.path.join(TEMP_OUTPUT_DIR, expected_glb_filename)
 
-    # We take the first generated GLB file
-    generated_glb_filename = generated_files[0]
-    temp_glb_path = os.path.join(TEMP_OUTPUT_DIR, generated_glb_filename)
+    if not os.path.exists(temp_glb_path):
+        # Fallback to listing files if naming convention changes
+        generated_files = [f for f in os.listdir(TEMP_OUTPUT_DIR) if f.endswith('.glb')]
+        if generated_files:
+            temp_glb_path = os.path.join(TEMP_OUTPUT_DIR, generated_files[0])
+        else:
+            raise Exception("Stable-Fast-3D ran but did not generate the expected .glb file.")
     
     # 4. Move and rename the GLB to the final public path (OVERWRITING the old one)
+    # Moves the GLB from TEMP_OUTPUT_DIR (backend/temp_3d_output/) to FIXED_GLB_PATH (frontend/public/latest_ar_model.glb)
     shutil.move(temp_glb_path, FIXED_GLB_PATH)
     
     # 5. Clean up temp files
+    # Only remove the input image if it's no longer needed after generation
     if os.path.exists(TEMP_INPUT_IMAGE_PATH):
         os.remove(TEMP_INPUT_IMAGE_PATH)
     
+    # Clean up the backend temp output directory
     for f in os.listdir(TEMP_OUTPUT_DIR):
         os.remove(os.path.join(TEMP_OUTPUT_DIR, f))
 
