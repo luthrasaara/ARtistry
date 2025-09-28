@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from "react"; 
 import { RefreshCw, Loader2, Zap, Palette, Eraser, Edit3, RotateCcw, Trash2, Download, Minus, Plus } from 'lucide-react'; 
+import ARViewer from './components/ARViewer';
 
 const DETECT_API_URL = "http://localhost:8000/detect_objects/"; 
-const AR_GENERATE_API_URL = "http://localhost:8000/image_to_ar/";
+// const AR_GENERATE_API_URL = "http://localhost:8000/image_to_ar/";
 
-// This public URL must match the location where your FastAPI backend 
-// places the final generated file in its publicly served directory.
-const GENERATED_MODEL_PUBLIC_URL = "/generated_models/0/mesh.glb"; 
+// Set the public URL for the hardcoded heart.glb model
+const GENERATED_MODEL_PUBLIC_URL = "/generated_models/heart.glb"; 
 
 // --- POLLING CONFIGURATION FOR LONG GENERATION JOBS ---
 const POLLING_INTERVAL_MS = 10000; // Check every 10 seconds
@@ -652,331 +652,6 @@ const Button = ({ children, onClick, disabled = false, className = '' }) => (
   </button>
 );
 
-// Define a constant for the desired scale factor
-const MODEL_SCALE_MULTIPLIER = 3.0; 
-
-const ARViewer = ({ modelPath }) => {
-  const canvasRef = useRef(null);
-  const videoRef = useRef(null);
-  
-  // THREE.js Scene Refs for persistent access
-  const sceneRef = useRef(null);
-  const rendererRef = useRef(null);
-  const cameraRef = useRef(null);
-  
-  // Only using OrbitControls for mouse/touch interaction
-  const controlsOrbitRef = useRef(null); 
-  
-  const modelRef = useRef(null); 
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); 
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [currentModelPathDisplay, setCurrentModelPathDisplay] = useState(modelPath);
-
-  // --- Dynamic Dependency Loading ---
-  useEffect(() => {
-    // Dynamically load the necessary Three.js scripts if they aren't already present
-    const scripts = [
-        "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
-        "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js",
-        "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js",
-    ];
-    
-    scripts.forEach((src) => {
-      const scriptId = `three-dep-${src.split('/').pop().split('.')[0]}`;
-      if (!document.getElementById(scriptId)) {
-        const script = document.createElement('script');
-        script.id = scriptId;
-        script.src = src;
-        script.async = true;
-        document.head.appendChild(script);
-      }
-    });
-  }, []);
-
-  // --- MODEL LOADING LOGIC ---
-  const loadGlbModel = useCallback((path, scene) => {
-    const THREE = window.THREE;
-    const GLTFLoader = window.THREE?.GLTFLoader;
-
-    if (!scene || !GLTFLoader || !THREE) {
-      // Dependencies not ready, wait for initScene to catch this
-      setLoading(false);
-      return; 
-    }
-
-    setLoading(true);
-    setError(null);
-    
-    // 1. Clean up old model if it exists
-    if (modelRef.current) {
-        scene.remove(modelRef.current);
-        // Dispose of resources to prevent memory leaks
-        modelRef.current.traverse((child) => {
-            if (child.isMesh) {
-                if (child.material.map) child.material.map.dispose();
-                child.material.dispose();
-                child.geometry.dispose();
-            }
-        });
-    }
-
-    // 2. Load new model
-    const loader = new GLTFLoader();
-    loader.load(
-      path,
-      (gltf) => {
-        const newModel = gltf.scene;
-        
-        // Setup shadows and materials
-        newModel.traverse((child) => {
-          if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-          }
-        });
-
-        // Calculate model normalization and initial position
-        const bbox = new THREE.Box3().setFromObject(newModel);
-        const size = bbox.getSize(new THREE.Vector3());
-        
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const scale = (1.0 / maxDim) * MODEL_SCALE_MULTIPLIER; 
-        newModel.scale.set(scale, scale, scale);
-        
-        // Set initial Z position
-        newModel.position.set(0, 0, -2.0);
-        
-        scene.add(newModel);
-        modelRef.current = newModel;
-        
-        setCurrentModelPathDisplay(path);
-        setLoading(false);
-      },
-      (xhr) => {
-        // Progress logger removed for cleanliness
-      },
-      (err) => {
-        console.error("Error loading GLB model:", err);
-        setError({ message: `Failed to load model from ${path}. Check the file path and CORS settings.` });
-        setCurrentModelPathDisplay('Load Failed');
-        setLoading(false);
-      }
-    );
-  }, []);
-
-  // --- SCENE INITIALIZATION ---
-  const initScene = useCallback(() => {
-    const THREE = window.THREE;
-    const OrbitControls = window.THREE?.OrbitControls; 
-
-    // 0. Dependency Check
-    if (!THREE || !OrbitControls) {
-      setError({
-        message: "3D libraries are loading. Please wait a moment and try 'Restart Viewer'.",
-        scripts: [
-          "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
-          "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js",
-          "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js",
-        ]
-      });
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    // Cleanup previous instance
-    if (rendererRef.current) {
-        rendererRef.current.dispose();
-        controlsOrbitRef.current?.dispose();
-    }
-    
-    // 1. Scene setup
-    const scene = new THREE.Scene();
-    // Use canvas's actual client size for aspect ratio
-    const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000); 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    
-    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.shadowMap.enabled = true;
-    renderer.setClearColor(0x000000, 0); // Transparent background
-
-    // Store refs
-    sceneRef.current = scene;
-    rendererRef.current = renderer;
-    cameraRef.current = camera;
-
-    // 1b. Add OrbitControls
-    const orbitControls = new OrbitControls(camera, renderer.domElement);
-    orbitControls.enableDamping = true; 
-    orbitControls.dampingFactor = 0.05;
-    orbitControls.minDistance = 1;
-    orbitControls.maxDistance = 10;
-    
-    // Set OrbitControls target and camera initial position
-    orbitControls.target.set(0, 0, -1.5); 
-    camera.position.z = 1.0; 
-    
-    controlsOrbitRef.current = orbitControls;
-    
-    // 2. Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-    scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    directionalLight.position.set(5, 10, 7.5);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
-
-    // 3. Handle Video Stream for AR Background
-    const setupVideoStream = async () => {
-      // Stop any existing stream
-      if (videoRef.current && videoRef.current.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: "environment" } 
-        });
-        
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setIsStreaming(true);
-        
-      } catch (err) {
-        console.error("Error accessing webcam: ", err);
-        setError({ message: "Could not access webcam. Ensure you grant camera permissions." });
-        setIsStreaming(false);
-        // Do not set loading false here, loading is set when the model loads
-      }
-    };
-    
-    // 4. Load initial model - Uses the prop provided by CreatePage
-    loadGlbModel(modelPath, scene);
-
-    // 5. Animation Loop
-    const animate = () => {
-      const animationId = requestAnimationFrame(animate);
-      controlsOrbitRef.current.update();
-      renderer.render(scene, camera);
-      return animationId;
-    };
-    
-    // 6. Handle Resize
-    const handleResize = () => {
-      if (canvasRef.current && cameraRef.current && rendererRef.current) {
-        cameraRef.current.aspect = canvasRef.current.clientWidth / canvas.clientHeight;
-        cameraRef.current.updateProjectionMatrix();
-        rendererRef.current.setSize(canvasRef.current.clientWidth, canvasRef.current.clientHeight);
-      }
-    };
-    
-    window.addEventListener('resize', handleResize);
-    
-    // Start video stream and animation
-    setupVideoStream();
-    let animationId = animate();
-
-    // Cleanup function
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animationId);
-      if (videoRef.current && videoRef.current.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      }
-      rendererRef.current?.dispose();
-      controlsOrbitRef.current?.dispose();
-    };
-    
-  }, [loadGlbModel, modelPath]); // Re-run initScene if modelPath changes
-
-  useEffect(() => {
-    initScene();
-  }, [initScene]);
-  
-  return (
-    <div className="flex flex-col items-center justify-center h-full w-full bg-gray-900 text-white p-4 font-sans">
-      <h1 className="text-xl font-extrabold mb-2 text-center text-indigo-400">
-        AR Viewer (Three.js)
-      </h1>
-      <p className="text-center text-xs mb-4 text-gray-400">
-        Use mouse or touch gestures to rotate and zoom the model over your live camera feed.
-      </p>
-
-      {/* Control Panel */}
-      <div className="flex justify-center space-x-4 mb-4 flex-wrap gap-2">
-        <Button onClick={initScene} disabled={loading} className="bg-gray-700 hover:bg-gray-600">
-            <RefreshCw className="w-4 h-4" />
-            <span>{loading ? 'Initializing...' : 'Restart Viewer'}</span>
-        </Button>
-      </div>
-
-      {/* Viewer Area */}
-      <div className="relative w-full max-w-4xl max-h-[80vh] aspect-square bg-black rounded-xl overflow-hidden shadow-2xl min-h-[300px]">
-        
-        {/* Static Video element background */}
-        <video ref={videoRef} autoPlay muted playsInline 
-               className="absolute top-0 left-0 w-full h-full object-cover z-0" 
-               style={{ opacity: 1 }}></video>
-        
-        {/* Canvas for Three.js rendering. Renders transparently on top */}
-        <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full z-10"></canvas>
-        
-        {/* Loading/Error Overlays */}
-        {(loading && !error) && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-800/80 backdrop-blur-sm z-20">
-            <div className="text-center p-4">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-400" />
-              <p className="mt-2 text-lg font-medium">Setting up environment...</p>
-              <p className="text-sm text-gray-400 mt-1">Accessing camera and loading 3D model...</p>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-red-900/80 p-4 z-30">
-            <div className="text-center max-w-lg mx-auto rounded-xl bg-red-800 p-6 shadow-xl border-4 border-red-500">
-              <Zap className="w-8 h-8 mx-auto text-yellow-300 mb-3" />
-              <p className="text-lg font-bold text-red-100 mb-2">Error</p>
-              <p className="text-sm text-red-100 mb-4">{error.message}</p>
-              
-              {error.scripts && (
-                <>
-                  <p className="text-xs text-red-200 mb-2">
-                    Ensure these libraries are globally loaded in your HTML:
-                  </p>
-                  <div className="bg-gray-900 p-3 rounded-lg text-left text-xs space-y-2 font-mono">
-                    {error.scripts.map((script, index) => (
-                        <code key={index} className="block whitespace-nowrap overflow-x-auto text-green-400">
-                            &lt;script src="{script}"&gt;&lt;/script&gt;
-                        </code>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {/* Bottom indicator */}
-        <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-40 bg-gray-900/70 text-xs px-3 py-1 rounded-full shadow-lg border border-indigo-500/50">
-            <span className="font-bold mr-1">Path:</span> 
-            <code className="text-indigo-300 font-mono overflow-hidden whitespace-nowrap max-w-[200px] inline-block align-bottom">
-                {currentModelPathDisplay}
-            </code>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 
 // ===========================================
 // 4. DETECTED IMAGE DISPLAY
@@ -1154,57 +829,16 @@ export default function CreatePage() {
   };
 
   const handleGenerateAR = async () => {
-    if (!originalImageBlob) {
-        setLoadingMessage("Error: No original image to generate AR model from.");
-        setIsGenerationFailed(true);
-        return;
-    }
-
+    // Skip API call, just show the AR viewer with the hardcoded model
     setIsLoading(true);
-    setIsGenerationFailed(false); // Reset failure status for retry
-    setLoadingMessage("Sending request to start AR generation job...");
-    
-    try {
-      const formData = new FormData();
-      formData.append("file", originalImageBlob, "user_drawing.png"); 
-
-      // 1. Fire the initial long-running request (use await to capture immediate errors)
-      const initialResponse = await fetch(AR_GENERATE_API_URL, {
-        method: "POST",
-        body: formData,
-      });
-      
-      if (!initialResponse.ok) {
-         const errorData = await initialResponse.json().catch(() => ({ detail: 'Non-JSON error response.' }));
-         // Throw immediately if the server returns a non-2xx status (like 500)
-         throw new Error(`Server failed to start AR job. Status: ${initialResponse.status} ${initialResponse.statusText}. Detail: ${errorData.detail || 'Check server logs for traceback.'}`);
-      }
-
-      // 2. Start polling for the generated file existence
-      // If the initial request succeeded (or returned a 202 Accepted, which is treated as success here)
-      // we proceed to poll for the output file.
-      await pollForModel(GENERATED_MODEL_PUBLIC_URL, MAX_POLLING_RETRIES);
-
-      // 3. Success: transition to AR viewer
-      console.log("AR model generation success. Setting fixed URL:", GENERATED_MODEL_PUBLIC_URL);
+    setIsGenerationFailed(false);
+    setLoadingMessage("Loading AR model...");
+    setTimeout(() => {
       setModelUrl(GENERATED_MODEL_PUBLIC_URL);
       setCurrentView(VIEWS.AR_VIEWER);
-      
-      // Cleanup on success
       setLoadingMessage('');
-
-    } catch (error) {
-      // 4. Failure: Stay on DETECTED view, show error message
-      console.error("Error generating AR model:", error);
-      
-      // Set the generation failure state
-      setIsGenerationFailed(true);
-      setLoadingMessage(`❌ Generation Failed: ${error.message}. Please check your server console (likely a resource or file permission issue) and click 'Retry Generation'.`);
-
-    } finally {
-      // 5. Stop the loading spinner (re-enables the button)
       setIsLoading(false);
-    }
+    }, 800); // Simulate a short loading delay for UX
   };
 
 
@@ -1249,14 +883,16 @@ export default function CreatePage() {
 
       case VIEWS.AR_VIEWER:
         return (
-          <div className="p-6 md:p-10 max-w-4xl mx-auto min-h-screen font-sans flex flex-col pt-8">
-            <button onClick={handleBackToDrawing} className={backButtonClass}>
+          <div className="fixed inset-0 min-h-screen w-screen bg-gradient-to-br from-indigo-100 via-blue-100 to-purple-100 flex flex-col items-center justify-center">
+            <button onClick={handleBackToDrawing} className={backButtonClass + " absolute top-8 left-8"}>
               ← Start Over
             </button>
             <h2 className="text-2xl font-bold mb-4 text-gray-700 text-center">Your AR Model ✨</h2>
-            {/* The ARViewer now takes the modelUrl state */}
-            <div className="flex-grow min-h-[500px] border-2 border-indigo-300 rounded-xl shadow-lg">
-              <ARViewer modelPath={modelUrl} />
+            {/* ARViewer uses the hardcoded model path */}
+            <div className="flex-grow w-full h-full flex items-center justify-center">
+              <div className="w-full h-full rounded-3xl overflow-hidden shadow-2xl border-4 border-indigo-200 bg-white/80 flex items-center justify-center">
+                <ARViewer modelPath={GENERATED_MODEL_PUBLIC_URL} />
+              </div>
             </div>
           </div>
         );
