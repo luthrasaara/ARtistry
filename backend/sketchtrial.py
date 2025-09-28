@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-HF_API_KEY = os.getenv("HF_API_KEY")
+HF_API_KEY = "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"
 HF_MODEL = "stabilityai/stable-fast-3d"
 
 if not HF_API_KEY:
@@ -58,3 +58,8 @@ async def convert_image_to_ar(file: UploadFile = File(...)):
         f.write(response.content)
 
     return FileResponse(glb_path, media_type="model/gltf-binary", filename=glb_filename)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    #uvicorn.run(app, host="0.0.0.0", port=8000)

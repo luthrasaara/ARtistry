@@ -304,7 +304,7 @@ const ARViewer = () => {
           <div className="absolute inset-0 flex items-center justify-center bg-red-900/80 p-4 z-30">
             <div className="text-center max-w-lg mx-auto rounded-xl bg-red-800 p-6 shadow-xl border-4 border-red-500">
               <Zap className="w-8 h-8 mx-auto text-yellow-300 mb-3" />
-              <p className="text-xl font-bold mb-2">CRITICAL ERROR: {error.message}</p>
+              
               
               {error.scripts && (
                 <>

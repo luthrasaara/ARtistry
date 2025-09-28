@@ -1,143 +1,207 @@
-'''import os
-import uuid
-from io import BytesIO
+import os
+import io
+import json
+import base64
+import subprocess # New: For running Stable-Fast-3D CLI
+import shutil     # New: For moving the generated GLB
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse # FIX: JSONResponse must be imported from fastapi.responses
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool # Essential for non-blocking execution
 
-import torch
-from PIL import Image, ImageDraw
-import io, json
-import trimesh
+from PIL import Image
 
 import google.generativeai as genai
-genai.configure(api_key=os.getenv("GEMINI_API"))  # Ensure this env variable is set
-model = genai.GenerativeModel("gemini-1.5-pro")
 
+# --- Gemini API Configuration ---
+api_key = os.getenv("GEMINI_API")
+if not api_key:
+    # Use a dummy key if running locally without the environment variable set
+    print("WARNING: GEMINI_API environment variable not set.")
+    # This prevents the script from crashing on genai.configure()
+    genai.configure(api_key="DUMMY_API_KEY") 
+else:
+    genai.configure(api_key=api_key) 
+    
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 app = FastAPI()
-prompt = """
-    Detect all objects in this image and return a JSON array.
-    Each entry should have:
-    - name (string)
-    - bounding_box: [x1, y1, x2, y2] in pixel coordinates
-    Example:
-    [
-    {"name": "cup", "bounding_box": [120, 80, 180, 200]},
-    {"name": "table", "bounding_box": [0, 250, 400, 400]}
-    ]
-"""
 
-# Directories for uploaded images and generated models
-UPLOAD_DIR = "uploaded_images"
-OUTPUT_DIR = "../frontend/public/generated_models"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ---------------------------------------------------------------------
+# 1. STABLE-FAST-3D CONFIGURATION (Global Variables)
+# ---------------------------------------------------------------------
+
+# 1. Base directory (where run.py and app.py are)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
+
+# 2. Public folder setup (Frontend access point)
+MODEL_DIR = os.path.join(BASE_DIR, "public", "generated_models")
+os.makedirs(MODEL_DIR, exist_ok=True) 
+
+# 3. Temp folders for input/output during generation
+TEMP_OUTPUT_DIR = os.path.join(BASE_DIR, "temp_output") 
+TEMP_INPUT_IMAGE_PATH = os.path.join(BASE_DIR, "temp_input.png")
+os.makedirs(TEMP_OUTPUT_DIR, exist_ok=True) 
+
+# 4. Final output file name (Fixed URL for the frontend)
+FIXED_GLB_FILENAME = "latest_ar_model.glb"
+FIXED_GLB_PATH = os.path.join(MODEL_DIR, FIXED_GLB_FILENAME)
+FIXED_PUBLIC_URL = f"/generated_models/{FIXED_GLB_FILENAME}"
 
 
+# ---------------------------------------------------------------------
+# 2. SYNCHRONOUS GLB GENERATION (Stable-Fast-3D integration)
+# ---------------------------------------------------------------------
 
-def create_textured_glb(image_bytes: bytes, glb_path: str):
+# This MUST be a regular synchronous 'def' function.
+def _sync_generate_glb(image_bytes):
     """
-    Creates a simple 3D plane mesh and textures it with the input image.
-    Exports the result directly to a GLB file.
+    1. Saves image bytes to a temp file.
+    2. Runs the 'python run.py' command using subprocess.
+    3. Finds the resulting GLB and moves it to the fixed public folder path.
     """
-    # 1. Load the image from bytes using PIL
+    
+    # 1. Save the incoming image bytes to a temporary file
     try:
-        image = Image.open(BytesIO(image_bytes))
-    except Exception:
-        raise ValueError("Invalid image file format.")
+        with open(TEMP_INPUT_IMAGE_PATH, 'wb') as f:
+            f.write(image_bytes)
+    except Exception as e:
+        raise Exception(f"Failed to save temporary input image: {e}")
 
-    # 2. Convert to square texture (Trimesh preference)
-    # Get max dimension for square scaling
-    max_dim = max(image.width, image.height)
+    # 2. Construct and run the command
+    command = [
+        "python", 
+        "run.py", 
+        TEMP_INPUT_IMAGE_PATH, 
+        "--output-dir", 
+        TEMP_OUTPUT_DIR
+    ]
     
-    # Create a simple square mesh (a quad)
-    # The dimensions are set to be AR-friendly (e.g., 1 unit in size)
-    mesh = trimesh.creation.box(extents=[1.0, 1.0, 0.01]) # A very thin box = a plane
+    print(f"Starting 3D generation: {' '.join(command)}")
 
-    # 3. Apply the image as a texture
-    # Create the Trimesh texture visualization object
-    material = trimesh.visual.TextureVisuals(image=image)
-    mesh.visual = material
-    
-    # Optional: Rotate the mesh so it's upright when viewed in AR (e.g., on a floor)
-    # This assumes the AR viewer expects Z-up or Y-up and might need adjustment 
-    # based on your specific AR front-end (e.g., A-Frame, USDZ viewer).
-    # mesh.apply_transform(trimesh.transformations.rotation_matrix(-np.pi/2, [1, 0, 0]))
+    try:
+        # Execute the command. The check=True ensures an error is raised on failure.
+        subprocess.run(
+            command, 
+            cwd=BASE_DIR, 
+            check=True, 
+            timeout=1200 # 20 minutes timeout for generation
+        )
+    except subprocess.CalledProcessError as e:
+        # Catches errors from the stable-fast-3d script itself
+        raise Exception(f"3D generation script failed. Output: {e.stderr}")
+    except subprocess.TimeoutExpired:
+        raise Exception("3D generation timed out.")
+    except Exception as e:
+        raise Exception(f"Subprocess execution error: {e}")
 
-    # 4. Export the mesh to GLB
-    # Trimesh handles embedding the image texture into the binary GLB blob.
-    mesh.export(glb_path, file_type='glb')
+    # 3. Find the generated GLB file
+    # Stable-Fast-3D names the file based on the input image name within TEMP_OUTPUT_DIR
+    generated_files = [f for f in os.listdir(TEMP_OUTPUT_DIR) if f.endswith('.glb')]
     
-    print(f"Generated GLB at: {glb_path} (Size: {os.path.getsize(glb_path)/1024:.2f} KB)")
+    if not generated_files:
+        raise Exception("Stable-Fast-3D ran but did not generate a .glb file.")
+
+    # We take the first generated GLB file
+    generated_glb_filename = generated_files[0]
+    temp_glb_path = os.path.join(TEMP_OUTPUT_DIR, generated_glb_filename)
+    
+    # 4. Move and rename the GLB to the final public path (OVERWRITING the old one)
+    shutil.move(temp_glb_path, FIXED_GLB_PATH)
+    
+    # 5. Clean up temp files
+    if os.path.exists(TEMP_INPUT_IMAGE_PATH):
+        os.remove(TEMP_INPUT_IMAGE_PATH)
+    
+    for f in os.listdir(TEMP_OUTPUT_DIR):
+        os.remove(os.path.join(TEMP_OUTPUT_DIR, f))
+
+# ---------------------------------------------------------------------
+# 3. ENDPOINTS
+# ---------------------------------------------------------------------
 
 @app.post("/image_to_ar/")
 async def convert_image_to_ar(file: UploadFile = File(...)):
-    # 1. Basic validation and unique naming
-    file_extension = os.path.splitext(file.filename)[1].lower()
-    if file_extension not in ['.jpg', '.jpeg', '.png']:
-        raise HTTPException(status_code=400, detail="Invalid file type. Only JPG/PNG accepted.")
-
-    # Generate a unique filename for the output GLB
-    unique_id = uuid.uuid4().hex
-    glb_filename = f"ar_model_{unique_id}.glb"
-    glb_path = os.path.join(OUTPUT_DIR, glb_filename)
     
-    # Read file content into memory buffer (safer and cleaner than saving to disk first)
-    image_data = await file.read()
-
-    # 2. Generate 3D Model and Export
+    # Read the file contents into 'image_bytes'
     try:
-        # Pass image data directly to the conversion function
-        create_textured_glb(image_data, glb_path)
+        image_bytes = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read image file: {e}")
+
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Received empty image file.")
+    
+    try:
+        # Delegate the slow synchronous task to a worker thread
+        await run_in_threadpool(_sync_generate_glb, image_bytes)
         
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=f"Image error: {ve}")
+        # Final check for successful file creation
+        if not os.path.exists(FIXED_GLB_PATH) or os.path.getsize(FIXED_GLB_PATH) < 100: 
+             raise Exception("Generated GLB file is missing or too small.")
+
     except Exception as e:
         print(f"3D Generation Error: {e}")
-        # Clean up if an incomplete GLB was created
-        if os.path.exists(glb_path):
-            os.remove(glb_path)
-        raise HTTPException(status_code=500, detail=f"3D generation failed: Internal Server Error.")
+        # Clean up on failure and raise the error for the frontend
+        if os.path.exists(FIXED_GLB_PATH):
+            os.remove(FIXED_GLB_PATH)
+        raise HTTPException(status_code=500, detail=f"3D generation failed: {str(e)}")
 
-    # 3. Return the GLB file to the client
-    # FastAPI automatically handles the cleanup of the file object after sending the response.
-    return FileResponse(
-        glb_path, 
-        media_type='model/gltf-binary', 
-        filename=glb_filename
-    )
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Return the fixed public URL (Frontend will load this path)
+    return JSONResponse(content={"model_url": FIXED_PUBLIC_URL})
 
 
-@app.post("/detect_draw/")
-async def detect_and_draw(file: UploadFile):
-    image = Image.open(io.BytesIO(await file.read()))
+@app.post("/detect_objects/")
+async def detect_objects(file: UploadFile = File(...)):
+    try:
+        image_bytes = await file.read()
+        image_part = Image.open(io.BytesIO(image_bytes))
 
-    prompt = """
-    Detect all objects in this image and return a JSON array.
-    Each entry should have:
-    - name (string)
-    - bounding_box: [x1, y1, x2, y2] in pixel coordinates
-    """
+        # --- Base64 Encode the original image ---
+        buffered = io.BytesIO()
+        image_part.save(buffered, format="PNG")
+        encoded_image_string = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        # ----------------------------------------
 
-    response = model.generate_content([prompt, image])
-    text = response.text
+        json_prompt = """
+            Detect all distinct objects in this image (this is a user drawing).
+            Return a JSON array ONLY. DO NOT include any surrounding text, markdown formatting (like ```json), or commentary.
+            Each entry must strictly follow this format:
+            {"name": "object_name", "bounding_box": [x1, y1, x2, y2]} in pixel coordinates.
+        """
+        response = model.generate_content(
+            contents=[json_prompt, image_part]
+        )
 
-    start = text.find('[')
-    end = text.rfind(']') + 1
-    detections = json.loads(text[start:end])
+        data_str = response.text.strip()
+        
+        # Clean up markdown formatting if present
+        if data_str.startswith("```json"):
+            data_str = data_str.replace("```json", "").replace("```", "").strip()
+        
+        if not data_str:
+            raise ValueError("Gemini returned an empty response.")
+            
+        objects = json.loads(data_str) 
 
-    draw = ImageDraw.Draw(image)
-    for obj in detections:
-        x1, y1, x2, y2 = obj["bounding_box"]
-        draw.rectangle([x1, y1, x2, y2], outline="red", width=3)
-        draw.text((x1, y1 - 10), obj["name"], fill="red")
+        # --- Return both objects and the encoded image ---
+        return JSONResponse(content={
+            "objects": objects,
+            "image": f"data:image/png;base64,{encoded_image_string}" # Prefix for display in HTML
+        })
 
-    output_path = "output_with_boxes.jpg"
-    image.save(output_path)
+    except Exception as e:
+        print(f"Unexpected Error in detect_objects: {e}")
+        return JSONResponse(status_code=500, content={"error": f"Internal server error: {str(e)}"})
 
-    return FileResponse(output_path)
-    '''
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
